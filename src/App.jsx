@@ -59,59 +59,52 @@ export default function MeditationApp() {
       const ctx = audioCtxRef.current;
       const now = ctx.currentTime;
 
-      // ── Phase 1: Five start-light arm beeps (0.0 → 1.6s) ──────────────
-      // Sharp square-wave blips, like each red light clicking on
-      for (let i = 0; i < 5; i++) {
-        const t = now + i * 0.38;
-        const osc = ctx.createOscillator();
-        const g = ctx.createGain();
-        osc.type = 'square';
-        osc.frequency.value = 960;
-        g.gain.setValueAtTime(0, t);
-        g.gain.linearRampToValueAtTime(0.18, t + 0.008);
-        g.gain.setValueAtTime(0.18, t + 0.07);
-        g.gain.linearRampToValueAtTime(0, t + 0.11);
-        osc.connect(g).connect(ctx.destination);
-        osc.start(t);
-        osc.stop(t + 0.15);
-      }
+      // ── Strike transient: filtered noise burst (the mallet hit) ──────────
+      const bufSize = Math.floor(ctx.sampleRate * 0.09);
+      const noiseBuf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+      const nd = noiseBuf.getChannelData(0);
+      for (let i = 0; i < bufSize; i++) nd[i] = Math.random() * 2 - 1;
+      const noise = ctx.createBufferSource();
+      noise.buffer = noiseBuf;
+      const noiseBp = ctx.createBiquadFilter();
+      noiseBp.type = 'bandpass';
+      noiseBp.frequency.value = 2800;
+      noiseBp.Q.value = 0.8;
+      const noiseG = ctx.createGain();
+      noiseG.gain.setValueAtTime(0.5, now);
+      noiseG.gain.exponentialRampToValueAtTime(0.0001, now + 0.09);
+      noise.connect(noiseBp).connect(noiseG).connect(ctx.destination);
+      noise.start(now);
 
-      // ── Phase 2: Lights-out horn blast (2.1s) ──────────────────────────
-      // Sawtooth sweep dropping from 480 → 90 Hz — like the launch signal
-      const hornT = now + 2.1;
-      const horn = ctx.createOscillator();
-      const hornG = ctx.createGain();
-      horn.type = 'sawtooth';
-      horn.frequency.setValueAtTime(480, hornT);
-      horn.frequency.exponentialRampToValueAtTime(90, hornT + 0.45);
-      hornG.gain.setValueAtTime(0, hornT);
-      hornG.gain.linearRampToValueAtTime(0.35, hornT + 0.04);
-      hornG.gain.setValueAtTime(0.35, hornT + 0.2);
-      hornG.gain.exponentialRampToValueAtTime(0.0001, hornT + 0.9);
-      horn.connect(hornG).connect(ctx.destination);
-      horn.start(hornT);
-      horn.stop(hornT + 1.0);
-
-      // ── Phase 3: Victory resonance (2.5s → 10s) ───────────────────────
-      // Warm harmonic undertones — the crowd roar settling into silence
-      const victoryT = now + 2.5;
+      // ── Inharmonic resonant partials (gong body) ──────────────────────
+      // Real gongs have non-integer frequency ratios — that's the key
+      // to their metallic shimmer vs. a pure bell.
+      // The fundamental also swells slightly in pitch after the strike.
       [
-        { freq: 110, gain: 0.28, decay: 7.5 },
-        { freq: 220, gain: 0.18, decay: 6.5 },
-        { freq: 330, gain: 0.10, decay: 5.5 },
-        { freq: 440, gain: 0.06, decay: 4.5 },
-        { freq: 660, gain: 0.03, decay: 3.5 },
-      ].forEach(({ freq, gain, decay }) => {
+        { freq: 76,   gain: 0.42, decay: 11.0, swell: true  },
+        { freq: 183,  gain: 0.28, decay:  9.0, swell: false },
+        { freq: 308,  gain: 0.18, decay:  7.0, swell: false },
+        { freq: 492,  gain: 0.10, decay:  5.0, swell: false },
+        { freq: 724,  gain: 0.06, decay:  3.5, swell: false },
+        { freq: 1090, gain: 0.03, decay:  2.0, swell: false },
+        { freq: 1840, gain: 0.015,decay:  0.9, swell: false },
+      ].forEach(({ freq, gain, decay, swell }) => {
         const osc = ctx.createOscillator();
         const g = ctx.createGain();
         osc.type = 'sine';
-        osc.frequency.value = freq;
-        g.gain.setValueAtTime(0, victoryT);
-        g.gain.linearRampToValueAtTime(gain, victoryT + 0.06);
-        g.gain.exponentialRampToValueAtTime(0.0001, victoryT + decay);
+        // Characteristic gong pitch swell on the fundamental
+        if (swell) {
+          osc.frequency.setValueAtTime(freq * 0.975, now);
+          osc.frequency.linearRampToValueAtTime(freq, now + 0.35);
+        } else {
+          osc.frequency.value = freq;
+        }
+        g.gain.setValueAtTime(0, now);
+        g.gain.linearRampToValueAtTime(gain, now + 0.012);
+        g.gain.exponentialRampToValueAtTime(0.0001, now + decay);
         osc.connect(g).connect(ctx.destination);
-        osc.start(victoryT);
-        osc.stop(victoryT + decay + 0.1);
+        osc.start(now);
+        osc.stop(now + decay + 0.1);
       });
     } catch (e) {
       console.warn('Audio not available', e);
@@ -435,7 +428,7 @@ export default function MeditationApp() {
         onMouseEnter={e => e.currentTarget.style.opacity = '1'}
         onMouseLeave={e => e.currentTarget.style.opacity = '0.5'}
       >
-        ▶ Preview Bell
+        ▶ Preview Gong
       </button>
 
       {/* Bottom red line */}
