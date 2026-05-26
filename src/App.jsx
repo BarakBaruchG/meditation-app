@@ -1,26 +1,33 @@
 import { useState, useEffect, useRef } from 'react';
 
+const RED = '#E10600';
+const RED_DIM = 'rgba(225,6,0,0.15)';
+const WHITE = '#FFFFFF';
+const GRAY = '#888888';
+const SURFACE = '#141414';
+const BORDER = 'rgba(255,255,255,0.08)';
+const FONT = "'Barlow Condensed', sans-serif";
+
 export default function MeditationApp() {
   const presets = [
-    { label: '5 min', seconds: 300 },
-    { label: '10 min', seconds: 600 },
-    { label: '15 min', seconds: 900 },
-    { label: '20 min', seconds: 1200 },
-    { label: '30 min', seconds: 1800 },
+    { label: '5 MIN', seconds: 300 },
+    { label: '10 MIN', seconds: 600 },
+    { label: '15 MIN', seconds: 900 },
+    { label: '20 MIN', seconds: 1200 },
+    { label: '30 MIN', seconds: 1800 },
   ];
 
   const [duration, setDuration] = useState(600);
   const [remaining, setRemaining] = useState(600);
   const [running, setRunning] = useState(false);
   const [finished, setFinished] = useState(false);
+  const [blink, setBlink] = useState(true);
   const audioCtxRef = useRef(null);
 
-  // Initialize / reset
   useEffect(() => {
     if (!running) setRemaining(duration);
   }, [duration, running]);
 
-  // Tick
   useEffect(() => {
     if (!running) return;
     const id = setInterval(() => {
@@ -38,21 +45,25 @@ export default function MeditationApp() {
     return () => clearInterval(id);
   }, [running]);
 
-  // Bell sound via Web Audio — singing-bowl-ish tone
+  // Blinking dot when running
+  useEffect(() => {
+    if (!running) { setBlink(true); return; }
+    const id = setInterval(() => setBlink((b) => !b), 600);
+    return () => clearInterval(id);
+  }, [running]);
+
   const playBell = () => {
     try {
       const Ctx = window.AudioContext || window.webkitAudioContext;
       if (!audioCtxRef.current) audioCtxRef.current = new Ctx();
       const ctx = audioCtxRef.current;
       const now = ctx.currentTime;
-
       const partials = [
         { freq: 220, gain: 0.35, decay: 6 },
         { freq: 440, gain: 0.25, decay: 5 },
         { freq: 660, gain: 0.12, decay: 4 },
         { freq: 880, gain: 0.06, decay: 3 },
       ];
-
       partials.forEach(({ freq, gain, decay }) => {
         const osc = ctx.createOscillator();
         const g = ctx.createGain();
@@ -81,12 +92,7 @@ export default function MeditationApp() {
   };
 
   const handlePause = () => setRunning(false);
-
-  const handleReset = () => {
-    setRunning(false);
-    setFinished(false);
-    setRemaining(duration);
-  };
+  const handleReset = () => { setRunning(false); setFinished(false); setRemaining(duration); };
 
   const fmt = (s) => {
     const m = Math.floor(s / 60).toString().padStart(2, '0');
@@ -95,184 +101,236 @@ export default function MeditationApp() {
   };
 
   const progress = 1 - remaining / duration;
-  const radius = 140;
+  const radius = 130;
   const circumference = 2 * Math.PI * radius;
   const dashOffset = circumference * (1 - progress);
 
-  return (
-    <div
-      style={{
-        minHeight: '100vh',
-        background:
-          'radial-gradient(ellipse at top, #c9b896 0%, #a89178 40%, #6b5640 100%)',
-        fontFamily: "'Cormorant Garamond', Georgia, serif",
-        color: '#3a2e22',
-        padding: '2rem 1rem',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        position: 'relative',
-        overflow: 'hidden',
-      }}
-    >
-      {/* subtle grain overlay */}
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          opacity: 0.08,
-          pointerEvents: 'none',
-          backgroundImage:
-            "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
-        }}
-      />
+  const statusLabel = finished ? 'SESSION COMPLETE' : running ? 'IN PROGRESS' : remaining < duration && remaining > 0 ? 'PAUSED' : 'READY';
+  const statusColor = finished ? RED : running ? WHITE : GRAY;
 
-      <div style={{ textAlign: 'center', marginBottom: '2rem', zIndex: 1 }}>
-        <p
-          style={{
-            letterSpacing: '0.4em',
-            fontSize: '0.75rem',
+  return (
+    <div style={{
+      minHeight: '100vh',
+      background: '#0a0a0a',
+      fontFamily: FONT,
+      color: WHITE,
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '2rem 1rem',
+      position: 'relative',
+      overflow: 'hidden',
+    }}>
+
+      {/* Background grid */}
+      <div style={{
+        position: 'absolute',
+        inset: 0,
+        backgroundImage: `
+          linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)
+        `,
+        backgroundSize: '60px 60px',
+        pointerEvents: 'none',
+      }} />
+
+      {/* Red accent line top */}
+      <div style={{
+        position: 'absolute',
+        top: 0, left: 0, right: 0,
+        height: '3px',
+        background: RED,
+      }} />
+
+      {/* Header */}
+      <div style={{ textAlign: 'center', marginBottom: '2.5rem', zIndex: 1 }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '0.75rem',
+          marginBottom: '0.6rem',
+        }}>
+          <div style={{ width: '24px', height: '2px', background: RED }} />
+          <p style={{
+            letterSpacing: '0.35em',
+            fontSize: '0.7rem',
+            color: GRAY,
             textTransform: 'uppercase',
-            margin: 0,
-            opacity: 0.7,
-          }}
-        >
-          A quiet moment
-        </p>
-        <h1
-          style={{
-            fontSize: '2.75rem',
-            fontWeight: 400,
-            fontStyle: 'italic',
-            margin: '0.25rem 0 0',
-            letterSpacing: '0.02em',
-          }}
-        >
-          Stillness
+            fontFamily: FONT,
+            fontWeight: 500,
+          }}>
+            Official Timekeeper
+          </p>
+          <div style={{ width: '24px', height: '2px', background: RED }} />
+        </div>
+        <h1 style={{
+          fontSize: '2.8rem',
+          fontWeight: 700,
+          letterSpacing: '0.15em',
+          textTransform: 'uppercase',
+          margin: 0,
+          fontFamily: FONT,
+          lineHeight: 1,
+        }}>
+          Precision<span style={{ color: RED }}> ·</span> Stillness
         </h1>
       </div>
 
-      {/* Timer ring */}
+      {/* Chronograph ring */}
       <div style={{ position: 'relative', zIndex: 1 }}>
         <svg width="320" height="320" style={{ display: 'block' }}>
           <defs>
-            <linearGradient id="ring" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#4a3c2a" />
-              <stop offset="100%" stopColor="#8a6f4f" />
-            </linearGradient>
+            <filter id="glow">
+              <feGaussianBlur stdDeviation="3" result="blur" />
+              <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+            </filter>
           </defs>
+
+          {/* Tick marks */}
+          {Array.from({ length: 60 }).map((_, i) => {
+            const angle = (i / 60) * 2 * Math.PI - Math.PI / 2;
+            const isMajor = i % 5 === 0;
+            const r1 = isMajor ? 148 : 151;
+            const r2 = 155;
+            return (
+              <line
+                key={i}
+                x1={160 + r1 * Math.cos(angle)}
+                y1={160 + r1 * Math.sin(angle)}
+                x2={160 + r2 * Math.cos(angle)}
+                y2={160 + r2 * Math.sin(angle)}
+                stroke={isMajor ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.12)'}
+                strokeWidth={isMajor ? 2 : 1}
+              />
+            );
+          })}
+
+          {/* Track */}
+          <circle cx="160" cy="160" r={radius} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="6" />
+
+          {/* Progress arc */}
           <circle
-            cx="160"
-            cy="160"
-            r={radius}
+            cx="160" cy="160" r={radius}
             fill="none"
-            stroke="rgba(58, 46, 34, 0.15)"
-            strokeWidth="2"
-          />
-          <circle
-            cx="160"
-            cy="160"
-            r={radius}
-            fill="none"
-            stroke="url(#ring)"
-            strokeWidth="3"
-            strokeLinecap="round"
+            stroke={finished ? RED : RED}
+            strokeWidth="6"
+            strokeLinecap="butt"
             strokeDasharray={circumference}
             strokeDashoffset={dashOffset}
             transform="rotate(-90 160 160)"
             style={{ transition: 'stroke-dashoffset 1s linear' }}
+            filter="url(#glow)"
           />
+
+          {/* Center surface */}
+          <circle cx="160" cy="160" r="110" fill={SURFACE} />
+          <circle cx="160" cy="160" r="110" fill="none" stroke={BORDER} strokeWidth="1" />
+
+          {/* Timer digits */}
           <text
-            x="160"
-            y="165"
+            x="160" y="158"
             textAnchor="middle"
             dominantBaseline="middle"
-            fontFamily="'Cormorant Garamond', Georgia, serif"
-            fontSize="56"
+            fontFamily={FONT}
+            fontSize="52"
             fontWeight="300"
-            fill="#3a2e22"
-            style={{ fontVariantNumeric: 'tabular-nums' }}
+            fill={WHITE}
+            style={{ fontVariantNumeric: 'tabular-nums', letterSpacing: '0.04em' }}
           >
             {fmt(remaining)}
           </text>
+
+          {/* Status */}
           <text
-            x="160"
-            y="200"
+            x="160" y="192"
             textAnchor="middle"
-            fontFamily="'Cormorant Garamond', Georgia, serif"
-            fontSize="13"
+            fontFamily={FONT}
+            fontSize="11"
+            fontWeight="600"
             letterSpacing="0.3em"
-            fill="#3a2e22"
-            opacity="0.5"
+            fill={statusColor}
           >
-            {finished ? 'COMPLETE' : running ? 'BREATHE' : 'READY'}
+            {statusLabel}
+          </text>
+
+          {/* Blinking dot when running */}
+          {running && (
+            <circle cx="160" cy="214" r="3" fill={RED} opacity={blink ? 1 : 0} />
+          )}
+
+          {/* Sector label top */}
+          <text x="160" y="80" textAnchor="middle" fontFamily={FONT} fontSize="10" fontWeight="500" letterSpacing="0.25em" fill={GRAY}>
+            CHRONOGRAPH
           </text>
         </svg>
       </div>
 
-      {/* Preset selection */}
-      <div
-        style={{
-          display: 'flex',
-          gap: '0.5rem',
-          marginTop: '2rem',
-          flexWrap: 'wrap',
-          justifyContent: 'center',
-          zIndex: 1,
-        }}
-      >
-        {presets.map((p) => (
-          <button
-            key={p.seconds}
-            onClick={() => !running && setDuration(p.seconds)}
-            disabled={running}
-            style={{
-              background:
-                duration === p.seconds
-                  ? 'rgba(58, 46, 34, 0.85)'
-                  : 'rgba(255, 255, 255, 0.15)',
-              color: duration === p.seconds ? '#f4ead5' : '#3a2e22',
-              border: '1px solid rgba(58, 46, 34, 0.3)',
-              padding: '0.5rem 1.1rem',
-              fontFamily: 'inherit',
-              fontSize: '0.95rem',
-              letterSpacing: '0.05em',
-              cursor: running ? 'not-allowed' : 'pointer',
-              opacity: running && duration !== p.seconds ? 0.4 : 1,
-              borderRadius: '2px',
-              transition: 'all 0.3s ease',
-            }}
-          >
-            {p.label}
-          </button>
-        ))}
+      {/* Preset selector */}
+      <div style={{
+        display: 'flex',
+        gap: '0.4rem',
+        marginTop: '2rem',
+        flexWrap: 'wrap',
+        justifyContent: 'center',
+        zIndex: 1,
+      }}>
+        {presets.map((p) => {
+          const active = duration === p.seconds;
+          return (
+            <button
+              key={p.seconds}
+              onClick={() => !running && setDuration(p.seconds)}
+              disabled={running}
+              style={{
+                background: active ? RED : 'transparent',
+                color: active ? WHITE : GRAY,
+                border: `1px solid ${active ? RED : 'rgba(255,255,255,0.12)'}`,
+                padding: '0.45rem 1rem',
+                fontFamily: FONT,
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                letterSpacing: '0.12em',
+                textTransform: 'uppercase',
+                cursor: running ? 'not-allowed' : 'pointer',
+                opacity: running && !active ? 0.3 : 1,
+                borderRadius: '0',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              {p.label}
+            </button>
+          );
+        })}
       </div>
 
       {/* Controls */}
-      <div
-        style={{
-          display: 'flex',
-          gap: '0.75rem',
-          marginTop: '1.5rem',
-          zIndex: 1,
-        }}
-      >
+      <div style={{
+        display: 'flex',
+        gap: '0.5rem',
+        marginTop: '1.25rem',
+        zIndex: 1,
+      }}>
         {!running ? (
           <button
             onClick={handleStart}
             style={{
-              background: '#3a2e22',
-              color: '#f4ead5',
+              background: RED,
+              color: WHITE,
               border: 'none',
-              padding: '0.9rem 2.5rem',
-              fontFamily: 'inherit',
-              fontSize: '1.05rem',
-              letterSpacing: '0.25em',
+              padding: '0.85rem 2.8rem',
+              fontFamily: FONT,
+              fontSize: '0.95rem',
+              fontWeight: 700,
+              letterSpacing: '0.2em',
               textTransform: 'uppercase',
               cursor: 'pointer',
-              borderRadius: '2px',
+              borderRadius: 0,
+              transition: 'opacity 0.2s',
             }}
+            onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
+            onMouseLeave={e => e.currentTarget.style.opacity = '1'}
           >
             {remaining < duration && remaining > 0 ? 'Resume' : 'Begin'}
           </button>
@@ -280,16 +338,17 @@ export default function MeditationApp() {
           <button
             onClick={handlePause}
             style={{
-              background: 'rgba(58, 46, 34, 0.2)',
-              color: '#3a2e22',
-              border: '1px solid #3a2e22',
-              padding: '0.9rem 2.5rem',
-              fontFamily: 'inherit',
-              fontSize: '1.05rem',
-              letterSpacing: '0.25em',
+              background: 'transparent',
+              color: RED,
+              border: `1px solid ${RED}`,
+              padding: '0.85rem 2.8rem',
+              fontFamily: FONT,
+              fontSize: '0.95rem',
+              fontWeight: 700,
+              letterSpacing: '0.2em',
               textTransform: 'uppercase',
               cursor: 'pointer',
-              borderRadius: '2px',
+              borderRadius: 0,
             }}
           >
             Pause
@@ -299,38 +358,56 @@ export default function MeditationApp() {
           onClick={handleReset}
           style={{
             background: 'transparent',
-            color: '#3a2e22',
-            border: '1px solid rgba(58, 46, 34, 0.4)',
-            padding: '0.9rem 1.5rem',
-            fontFamily: 'inherit',
-            fontSize: '1.05rem',
-            letterSpacing: '0.25em',
+            color: GRAY,
+            border: '1px solid rgba(255,255,255,0.12)',
+            padding: '0.85rem 1.6rem',
+            fontFamily: FONT,
+            fontSize: '0.95rem',
+            fontWeight: 600,
+            letterSpacing: '0.2em',
             textTransform: 'uppercase',
             cursor: 'pointer',
-            borderRadius: '2px',
+            borderRadius: 0,
+            transition: 'color 0.2s, border-color 0.2s',
           }}
+          onMouseEnter={e => { e.currentTarget.style.color = WHITE; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.4)'; }}
+          onMouseLeave={e => { e.currentTarget.style.color = GRAY; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; }}
         >
           Reset
         </button>
       </div>
 
+      {/* Bell preview */}
       <button
         onClick={playBell}
         style={{
           marginTop: '2rem',
           background: 'transparent',
-          color: '#3a2e22',
+          color: GRAY,
           border: 'none',
-          fontFamily: 'inherit',
-          fontStyle: 'italic',
-          fontSize: '0.95rem',
-          opacity: 0.6,
+          fontFamily: FONT,
+          fontSize: '0.75rem',
+          fontWeight: 500,
+          letterSpacing: '0.25em',
+          textTransform: 'uppercase',
           cursor: 'pointer',
           zIndex: 1,
+          opacity: 0.5,
+          transition: 'opacity 0.2s',
         }}
+        onMouseEnter={e => e.currentTarget.style.opacity = '1'}
+        onMouseLeave={e => e.currentTarget.style.opacity = '0.5'}
       >
-        ··· preview bell ···
+        ▶ Preview Bell
       </button>
+
+      {/* Bottom red line */}
+      <div style={{
+        position: 'absolute',
+        bottom: 0, left: 0, right: 0,
+        height: '2px',
+        background: `linear-gradient(90deg, transparent, ${RED}, transparent)`,
+      }} />
     </div>
   );
 }
