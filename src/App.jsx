@@ -58,23 +58,60 @@ export default function MeditationApp() {
       if (!audioCtxRef.current) audioCtxRef.current = new Ctx();
       const ctx = audioCtxRef.current;
       const now = ctx.currentTime;
-      const partials = [
-        { freq: 220, gain: 0.35, decay: 6 },
-        { freq: 440, gain: 0.25, decay: 5 },
-        { freq: 660, gain: 0.12, decay: 4 },
-        { freq: 880, gain: 0.06, decay: 3 },
-      ];
-      partials.forEach(({ freq, gain, decay }) => {
+
+      // ── Phase 1: Five start-light arm beeps (0.0 → 1.6s) ──────────────
+      // Sharp square-wave blips, like each red light clicking on
+      for (let i = 0; i < 5; i++) {
+        const t = now + i * 0.38;
+        const osc = ctx.createOscillator();
+        const g = ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.value = 960;
+        g.gain.setValueAtTime(0, t);
+        g.gain.linearRampToValueAtTime(0.18, t + 0.008);
+        g.gain.setValueAtTime(0.18, t + 0.07);
+        g.gain.linearRampToValueAtTime(0, t + 0.11);
+        osc.connect(g).connect(ctx.destination);
+        osc.start(t);
+        osc.stop(t + 0.15);
+      }
+
+      // ── Phase 2: Lights-out horn blast (2.1s) ──────────────────────────
+      // Sawtooth sweep dropping from 480 → 90 Hz — like the launch signal
+      const hornT = now + 2.1;
+      const horn = ctx.createOscillator();
+      const hornG = ctx.createGain();
+      horn.type = 'sawtooth';
+      horn.frequency.setValueAtTime(480, hornT);
+      horn.frequency.exponentialRampToValueAtTime(90, hornT + 0.45);
+      hornG.gain.setValueAtTime(0, hornT);
+      hornG.gain.linearRampToValueAtTime(0.35, hornT + 0.04);
+      hornG.gain.setValueAtTime(0.35, hornT + 0.2);
+      hornG.gain.exponentialRampToValueAtTime(0.0001, hornT + 0.9);
+      horn.connect(hornG).connect(ctx.destination);
+      horn.start(hornT);
+      horn.stop(hornT + 1.0);
+
+      // ── Phase 3: Victory resonance (2.5s → 10s) ───────────────────────
+      // Warm harmonic undertones — the crowd roar settling into silence
+      const victoryT = now + 2.5;
+      [
+        { freq: 110, gain: 0.28, decay: 7.5 },
+        { freq: 220, gain: 0.18, decay: 6.5 },
+        { freq: 330, gain: 0.10, decay: 5.5 },
+        { freq: 440, gain: 0.06, decay: 4.5 },
+        { freq: 660, gain: 0.03, decay: 3.5 },
+      ].forEach(({ freq, gain, decay }) => {
         const osc = ctx.createOscillator();
         const g = ctx.createGain();
         osc.type = 'sine';
         osc.frequency.value = freq;
-        g.gain.setValueAtTime(0, now);
-        g.gain.linearRampToValueAtTime(gain, now + 0.02);
-        g.gain.exponentialRampToValueAtTime(0.0001, now + decay);
+        g.gain.setValueAtTime(0, victoryT);
+        g.gain.linearRampToValueAtTime(gain, victoryT + 0.06);
+        g.gain.exponentialRampToValueAtTime(0.0001, victoryT + decay);
         osc.connect(g).connect(ctx.destination);
-        osc.start(now);
-        osc.stop(now + decay + 0.1);
+        osc.start(victoryT);
+        osc.stop(victoryT + decay + 0.1);
       });
     } catch (e) {
       console.warn('Audio not available', e);
